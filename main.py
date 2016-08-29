@@ -18,7 +18,7 @@ ro = parameters["mixture coefficient"]
 N = parameters["number of observations"]
 
 # Monte Carlo
-M = parameters["Monte Carlo"]["number of particles"]
+Ms = parameters["Monte Carlo"]["number of particles"]
 nu = parameters["Monte Carlo"]["prior hyperparameters"]["nu"]
 lamb = parameters["Monte Carlo"]["prior hyperparameters"]["lambda"]
 M_T_over_M = parameters["Monte Carlo"]["ratio of particles to be clipped"]
@@ -28,11 +28,8 @@ random_seed = parameters.get("random seed")
 
 # ---------------------
 
-# number of highest weights for the clipping procedure
-M_T = int(M*M_T_over_M)
-
-# [<trial>, <component within the state vector>, <algorithm>]
-estimates = np.empty((n_trials, 2, 2))
+# [<trial>, <component within the state vector>, <number of particles>, <algorithm>]
+estimates = np.empty((n_trials, 2, len(Ms), 2))
 
 # the proposal is a Gaussian density with parameters...
 proposal_mean, proposal_sd = nu, np.sqrt(variance/lamb)
@@ -52,8 +49,11 @@ for i_trial in range(n_trials):
 
 	observations = gmm.sample(n_samples=N, random_state=prng).flatten()
 
-	# samples are drawn for every particle *and* every component
-	samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(M, 2))
+	# the maximum number of particles
+	max_M = max(Ms)
+
+	# samples are drawn for every particle *and* every component (for the maximum number of particles required)
+	samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(max_M, 2))
 
 	# computation of the factor every *individual* observations contributes to the likelihood
 	# (every row is associated with an observation, and every column with a particle)
@@ -65,36 +65,47 @@ for i_trial in range(n_trials):
 	# the likelihood is given by the product of the individual factors
 	likelihood = likelihood_factors.prod(axis=0)
 
-	# weights are obtained by normalizing the values above
-	weights = likelihood / likelihood.sum()
+	for i_M, M in enumerate(sorted(Ms)):
 
-	# regular IW-based estimate
-	estimates[i_trial, :, 0] = weights @ samples
+		# the first "M" likelihoods...
+		M_likelihoods = likelihood[:M].copy()
+		
+		# ...and samples are selected
+		M_samples = samples[:M, :]
 
-	# --------------------- transformed importance weights
+		# weights are obtained by normalizing the likelihoods
+		weights = M_likelihoods / M_likelihoods.sum()
 
-	# NOTE: *likelihood* is modified
+		# regular IW-based estimate
+		estimates[i_trial, :, i_M, 0] = weights @ M_samples
 
-	# clipping
-	i_clipped = np.argpartition(likelihood, -M_T)[-M_T:]
+		# --------------------- transformed importance weights
 
-	# minimum (unnormalized) weight among those to be clipped
-	clipping_threshold = likelihood[i_clipped[0]]
+		# NOTE: *M_likelihoods* is modified below
 
-	# the largest (unnormalized) weights are "clipped"
-	likelihood[i_clipped] = clipping_threshold
+		# number of highest weights for the clipping procedure
+		M_T = int(M * M_T_over_M)
 
-	# normalized weights are obtained
-	weights = likelihood / likelihood.sum()
+		# clipping
+		i_clipped = np.argpartition(M_likelihoods, -M_T)[-M_T:]
 
-	#  TIW-based estimate
-	estimates[i_trial, :, 1] = weights @ samples
+		# minimum (unnormalized) weight among those to be clipped
+		clipping_threshold = M_likelihoods[i_clipped[0]]
 
-# MMSE computation (every row is a trial, every column is an algorithm)
-mmse = np.sum((estimates - true_means[np.newaxis, :, np.newaxis])**2, axis=1)
+		# the largest (unnormalized) weights are "clipped"
+		M_likelihoods[i_clipped] = clipping_threshold
 
-# every element corresponds to one algorithm
+		# normalized weights are obtained
+		weights = M_likelihoods / M_likelihoods.sum()
+
+		#  TIW-based estimate
+		estimates[i_trial, :, i_M, 1] = weights @ M_samples
+
+# MMSE computation [<trial>, <number of particles>, <algorithm>]
+mmse = np.sum((estimates - true_means[np.newaxis, :, np.newaxis, np.newaxis])**2, axis=1)
+
+# [<number of particles>, <algorithm>]
 average_mmse = mmse.mean(axis=0)
 
-# variance (every row is an *algorithm*, every column a component of the state vector)
-variance = np.var(estimates, axis=0).T
+# variance [<component of the state vector>, <number of particles>, <algorithm>]
+variance = np.var(estimates, axis=0)

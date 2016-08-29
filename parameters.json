@@ -9,7 +9,7 @@
 	"number of observations": 100,
 	
 	"Monte Carlo": {
-		"number of particles": 10000,
+		"number of particles": [10000],
 		"prior hyperparameters": {
 			"nu": 1,
 			"lambda": 0.1
