@@ -1,33 +1,30 @@
+import json
+
 import numpy as np
 from sklearn.mixture import GMM
 
-# --------------------- general parameters
+# --------------------- parameters are read
 
-# number of trials
-n_trials = 100
+with open('parameters.json') as json_data:
 
-# mixture coefficient
-ro = 0.2
+	# the parameters file is read to memory
+	parameters = json.load(json_data)
 
-# variance of both Gaussians (known)
-variance = 1
+n_trials = parameters["number of trials"]
 
-# a vector with the *true* true_means of the Gaussians
-true_means = np.array([0, 2])
+true_means = np.array(parameters["true means"])
+variance = parameters["variance"] # variance of *both* Gaussians (known)
+ro = parameters["mixture coefficient"]
+N = parameters["number of observations"]
 
-# number of observations
-N = 100
+# Monte Carlo
+M = parameters["Monte Carlo"]["number of particles"]
+nu = parameters["Monte Carlo"]["prior hyperparameters"]["nu"]
+lamb = parameters["Monte Carlo"]["prior hyperparameters"]["lambda"]
+M_T_over_M = parameters["Monte Carlo"]["ratio of particles to be clipped"]
 
-# --------------------- PMC
-
-# number of particles
-M = 10000
-
-# hyperparameters for the prior pdf
-nu, lamb = 1, 0.1
-
-# ratio between the number of particles and that of non-negligible weights
-M_T_over_M = 0.1
+# if a random seed is not provided, this is None
+random_seed = parameters.get("random seed")
 
 # ---------------------
 
@@ -40,7 +37,7 @@ estimates = np.empty((n_trials, 2, 2))
 proposal_mean, proposal_sd = nu, np.sqrt(variance/lamb)
 
 # pseudo-random numbers generator
-prng = np.random.RandomState(123456)
+prng = np.random.RandomState(random_seed)
 
 # a Gaussian Mixture Model is built...
 gmm = GMM(n_components=2, random_state=prng, n_iter=1)
@@ -80,13 +77,13 @@ for i_trial in range(n_trials):
 	# clipping
 	i_clipped = np.argpartition(likelihood, -M_T)[-M_T:]
 
-	# minimum weight among those to be clipped
+	# minimum (unnormalized) weight among those to be clipped
 	clipping_threshold = likelihood[i_clipped[0]]
 
-	# the largest weights are "clipped"
+	# the largest (unnormalized) weights are "clipped"
 	likelihood[i_clipped] = clipping_threshold
 
-	# weights are obtained by normalizing the values above
+	# normalized weights are obtained
 	weights = likelihood / likelihood.sum()
 
 	#  TIW-based estimate
@@ -95,6 +92,7 @@ for i_trial in range(n_trials):
 # MMSE computation (every row is a trial, every column a component of the state vector)
 mmse = np.sum((estimates - true_means[np.newaxis, :, np.newaxis])**2, axis=1)
 
+# every element corresponds to one algorithm
 average_mmse = mmse.mean(axis=0)
 
 # variance (every row is an *algorithm*, every column a component of the state vector)

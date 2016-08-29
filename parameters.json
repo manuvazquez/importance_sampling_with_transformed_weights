@@ -1,0 +1,19 @@
+{
+	"number of trials": 100,
+	
+	"random seed": 123456,
+	
+	"true means": [0,2],
+	"variance": 1,
+	"mixture coefficient": 0.2,
+	"number of observations": 100,
+	
+	"Monte Carlo": {
+		"number of particles": 10000,
+		"prior hyperparameters": {
+			"nu": 1,
+			"lambda": 0.1
+		},
+		"ratio of particles to be clipped": 0.1
+	}
+}
