@@ -31,6 +31,7 @@ random_seed = parameters.get("random seed")
 # number of highest weights for the clipping procedure
 M_T = int(M*M_T_over_M)
 
+# [<trial>, <component within the state vector>, <algorithm>]
 estimates = np.empty((n_trials, 2, 2))
 
 # the proposal is a Gaussian density with parameters...
@@ -89,7 +90,7 @@ for i_trial in range(n_trials):
 	#  TIW-based estimate
 	estimates[i_trial, :, 1] = weights @ samples
 
-# MMSE computation (every row is a trial, every column a component of the state vector)
+# MMSE computation (every row is a trial, every column is an algorithm)
 mmse = np.sum((estimates - true_means[np.newaxis, :, np.newaxis])**2, axis=1)
 
 # every element corresponds to one algorithm
