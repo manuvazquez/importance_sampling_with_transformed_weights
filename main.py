@@ -1,4 +1,7 @@
+#! /usr/bin/env python3
+
 import json
+import colorama
 
 # output file name
 import os
@@ -50,10 +53,12 @@ gmm = GMM(n_components=2, random_state=prng, n_iter=1)
 
 # ...and the required parameters set up
 gmm.means_ = np.reshape(true_means, (-1, 1))
-gmm.covars_ = np.full(shape=(2,1),fill_value=variance, dtype=float)
+gmm.covars_ = np.full(shape=(2, 1), fill_value=variance, dtype=float)
 gmm.weights_ = np.array([ro, 1-ro])
 
 for i_trial in range(n_trials):
+
+	print('trial ' + colorama.Fore.LIGHTWHITE_EX + '{}'.format(i_trial) + colorama.Style.RESET_ALL)
 
 	observations = gmm.sample(n_samples=N, random_state=prng).flatten()
 
@@ -72,9 +77,6 @@ for i_trial in range(n_trials):
 
 	# the likelihood is given by the product of the individual factors
 	likelihood = likelihood_factors.prod(axis=0)
-
-	# # in order to avoid divide-by-zero issues
-	# likelihood += 1e-200
 
 	for i_M, M in enumerate(sorted(Ms)):
 
@@ -119,7 +121,7 @@ mmse = np.sum((estimates - true_means[np.newaxis, :, np.newaxis, np.newaxis])**2
 average_mmse = mmse.mean(axis=0)
 
 # variance [<component of the state vector>, <number of particles>, <algorithm>]
-variance = np.var(estimates, axis=0)
+estimates_variance = np.var(estimates, axis=0)
 
 # --------------------- the name of the output file is constructed
 
