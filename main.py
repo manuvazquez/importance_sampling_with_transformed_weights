@@ -1,5 +1,13 @@
 import json
 
+# output file name
+import os
+import time
+import socket
+
+# data saving
+import h5py
+
 import numpy as np
 from sklearn.mixture import GMM
 
@@ -65,6 +73,9 @@ for i_trial in range(n_trials):
 	# the likelihood is given by the product of the individual factors
 	likelihood = likelihood_factors.prod(axis=0)
 
+	# # in order to avoid divide-by-zero issues
+	# likelihood += 1e-200
+
 	for i_M, M in enumerate(sorted(Ms)):
 
 		# the first "M" likelihoods...
@@ -109,3 +120,32 @@ average_mmse = mmse.mean(axis=0)
 
 # variance [<component of the state vector>, <number of particles>, <algorithm>]
 variance = np.var(estimates, axis=0)
+
+# --------------------- the name of the output file is constructed
+
+# the name of the machine running the program (supposedly, using the socket module gives rise to portable code)
+hostname = socket.gethostname()
+
+# date and time
+date = time.strftime("%a_%Y-%m-%d_%H:%M:%S")
+
+# output data file
+output_file = hostname + '_' + date + '_' + str(os.getpid())
+
+# --------------------- data saving
+
+file = h5py.File('res_' + output_file + '.hdf5', 'w')
+
+file.create_dataset('estimated means', shape=estimates.shape, data=estimates)
+file.create_dataset('true means', shape=true_means.shape, data=true_means)
+
+file.attrs['number of particles'] = Ms
+file.attrs['random seed'] = random_seed
+
+file.close()
+
+# --------------------- plotting
+
+# import plot
+# plot.mmse(Ms, average_mmse)
+# plot.variance(Ms, variance)

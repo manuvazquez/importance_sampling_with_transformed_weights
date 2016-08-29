@@ -1,2 +1,4 @@
 .idea
 changelog
+res_*
+__pycache__
