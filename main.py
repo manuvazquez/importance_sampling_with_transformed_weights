@@ -1,18 +1,19 @@
 #! /usr/bin/env python3
 
-import json
-import colorama
-
-# output file name
 import os
-import time
-import socket
+import sys
+import json
+import pickle
 
-# data saving
 import h5py
+import colorama
 
 import numpy as np
 from sklearn.mixture import GMM
+
+sys.path.append(os.path.join(os.environ['HOME'], 'python'))
+
+import manu.util
 
 # --------------------- parameters are read
 
@@ -123,16 +124,8 @@ average_mmse = mmse.mean(axis=0)
 # variance [<component of the state vector>, <number of particles>, <algorithm>]
 estimates_variance = np.var(estimates, axis=0)
 
-# --------------------- the name of the output file is constructed
-
-# the name of the machine running the program (supposedly, using the socket module gives rise to portable code)
-hostname = socket.gethostname()
-
-# date and time
-date = time.strftime("%a_%Y-%m-%d_%H:%M:%S")
-
 # output data file
-output_file = hostname + '_' + date + '_' + str(os.getpid())
+output_file = manu.util.filename_from_host_and_date()
 
 # --------------------- data saving
 
@@ -142,12 +135,19 @@ file.create_dataset('estimated means', shape=estimates.shape, data=estimates)
 file.create_dataset('true means', shape=true_means.shape, data=true_means)
 
 file.attrs['number of particles'] = Ms
-file.attrs['random seed'] = random_seed
+
+if random_seed:
+
+	file.attrs['random seed'] = random_seed
 
 file.close()
 
-# --------------------- plotting
+# in a separate file with the same name as the data file but different extension...
+parameters_file = 'res_{}.parameters'.format(output_file)
 
-# import plot
-# plot.mmse(Ms, average_mmse)
-# plot.variance(Ms, variance)
+with open(parameters_file, mode='wb') as f:
+
+	#  ...parameters are pickled
+	pickle.dump(parameters, f)
+
+print('parameters saved in "{}"'.format(parameters_file))
