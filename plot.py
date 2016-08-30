@@ -25,7 +25,7 @@ def mmse(x, ys, output_file=None):
 
 	ax, fig = setup_axes('MMSE')
 
-	for y, label, color, marker in zip(ys.T, ['Standard', 'TIW'], ['black', 'blue'], ['s', 'o']):
+	for y, label, color, marker in zip(ys.T, ['plain IW', 'TIW'], ['black', 'blue'], ['s', 'o']):
 
 		ax.loglog(x, y, label=label, color=color, marker=marker)
 
@@ -46,14 +46,17 @@ def variance(x, ys, output_file=None):
 
 	ax, fig = setup_axes('variance')
 
-	for alg_y, label, color, marker in zip(np.rollaxis(ys, 2), ['Standard', 'TIW'], ['black', 'blue'], ['s', 'o']):
+	for alg_y, label, color, marker in zip(np.rollaxis(ys, 2), ['plain IW', 'TIW'], ['black', 'blue'], ['s', 'o']):
 
-		for y, label_suffix, linestyle in zip(alg_y, ['0', '1'], ['dotted', 'dashed']):
+		for y, coeff_label, linestyle in zip(alg_y, ['$\\theta_1$', '$\\theta_2$'], ['dotted', 'dashed']):
 
-			ax.loglog(x, y, label=label + label_suffix, color=color, marker=marker, linestyle=linestyle)
+			ax.loglog(x, y, label='{} for {}'.format(coeff_label, label), color=color, marker=marker, linestyle=linestyle)
 
 	# the labels are shown
 	ax.legend()
+
+	ax.set_xlabel('number of particles')
+	ax.set_ylabel('variance')
 
 	if output_file:
 
