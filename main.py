@@ -33,12 +33,16 @@ N = parameters["number of observations"]
 Ms = parameters["Monte Carlo"]["number of particles"]
 nu = parameters["Monte Carlo"]["prior hyperparameters"]["nu"]
 lamb = parameters["Monte Carlo"]["prior hyperparameters"]["lambda"]
+
 M_T_over_M = parameters["Monte Carlo"]["ratio of particles to be clipped"]
 
 # if a random seed is not provided, this is None
 random_seed = parameters.get("random seed")
 
 # ---------------------
+
+# number of highest weights for the clipping procedure
+M_Ts_list = [int(M * M_T_over_M) for M in Ms]
 
 # [<trial>, <component within the state vector>, <number of particles>, <algorithm>]
 estimates = np.empty((n_trials, 2, len(Ms), 2))
@@ -79,7 +83,7 @@ for i_trial in range(n_trials):
 	# the likelihood is given by the product of the individual factors
 	likelihood = likelihood_factors.prod(axis=0)
 
-	for i_M, M in enumerate(sorted(Ms)):
+	for i_M, (M, M_T) in enumerate(zip(Ms, M_Ts_list)):
 
 		# the first "M" likelihoods...
 		M_likelihoods = likelihood[:M].copy()
@@ -96,9 +100,6 @@ for i_trial in range(n_trials):
 		# --------------------- transformed importance weights
 
 		# NOTE: *M_likelihoods* is modified below
-
-		# number of highest weights for the clipping procedure
-		M_T = int(M * M_T_over_M)
 
 		# clipping
 		i_clipped = np.argpartition(M_likelihoods, -M_T)[-M_T:]
@@ -124,10 +125,12 @@ average_mmse = mmse.mean(axis=0)
 # variance [<component of the state vector>, <number of particles>, <algorithm>]
 estimates_variance = np.var(estimates, axis=0)
 
-# output data file
-output_file = manu.util.filename_from_host_and_date()
+print(average_mmse)
 
 # --------------------- data saving
+
+# output data file
+output_file = manu.util.filename_from_host_and_date()
 
 file = h5py.File('res_' + output_file + '.hdf5', 'w')
 
