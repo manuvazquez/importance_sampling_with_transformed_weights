@@ -4,6 +4,7 @@ import os
 import sys
 import json
 import pickle
+import types
 
 import h5py
 import colorama
@@ -33,8 +34,10 @@ N = parameters["number of observations"]
 Ms = parameters["Monte Carlo"]["number of particles"]
 nu = parameters["Monte Carlo"]["prior hyperparameters"]["nu"]
 lamb = parameters["Monte Carlo"]["prior hyperparameters"]["lambda"]
+n_clipped_particles_from_overall = eval(parameters["Monte Carlo"]["number of clipped particles from overall number"])
 
-M_T_over_M = parameters["Monte Carlo"]["ratio of particles to be clipped"]
+# this should be a function
+assert type(n_clipped_particles_from_overall) == types.FunctionType
 
 # if a random seed is not provided, this is None
 random_seed = parameters.get("random seed")
@@ -42,7 +45,7 @@ random_seed = parameters.get("random seed")
 # ---------------------
 
 # number of highest weights for the clipping procedure
-M_Ts_list = [int(M * M_T_over_M) for M in Ms]
+M_Ts_list = [n_clipped_particles_from_overall(M) for M in Ms]
 
 # [<trial>, <component within the state vector>, <number of particles>, <algorithm>]
 estimates = np.empty((n_trials, 2, len(Ms), 2))

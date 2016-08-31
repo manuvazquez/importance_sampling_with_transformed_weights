@@ -14,6 +14,7 @@
 			"nu": 1,
 			"lambda": 0.1
 		},
-		"ratio of particles to be clipped": 0.1
+
+		"number of clipped particles from overall number": "lambda x: int(x/10)"
 	}
 }

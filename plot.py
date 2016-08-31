@@ -21,7 +21,7 @@ def setup_axes(figure_id, clear_figure=True):
 	return axes, fig
 
 
-def mmse(x, ys, output_file=None):
+def mse(x, ys, output_file=None):
 
 	ax, fig = setup_axes('MMSE')
 
