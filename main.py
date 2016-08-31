@@ -50,6 +50,10 @@ M_Ts_list = [n_clipped_particles_from_overall(M) for M in Ms]
 # [<trial>, <component within the state vector>, <number of particles>, <algorithm>]
 estimates = np.empty((n_trials, 2, len(Ms), 2))
 
+# [<trial>, <number of particles>, <algorithm>]
+M_eff = np.empty((n_trials, len(Ms), 2))
+max_weight = np.empty((n_trials, len(Ms), 2))
+
 # the proposal is a Gaussian density with parameters...
 proposal_mean, proposal_sd = nu, np.sqrt(variance/lamb)
 
@@ -100,6 +104,12 @@ for i_trial in range(n_trials):
 		# regular IW-based estimate
 		estimates[i_trial, :, i_M, 0] = weights @ M_samples
 
+		# effective sample size...
+		M_eff[i_trial, i_M, 0] = 1.0/np.sum(weights**2)
+
+		# ...and maximum weight
+		max_weight[i_trial, i_M, 0] = weights.max()
+
 		# --------------------- transformed importance weights
 
 		# NOTE: *M_likelihoods* is modified below
@@ -118,6 +128,9 @@ for i_trial in range(n_trials):
 
 		#  TIW-based estimate
 		estimates[i_trial, :, i_M, 1] = weights @ M_samples
+
+		M_eff[i_trial, i_M, 1] = 1.0 / np.sum(weights ** 2)
+		max_weight[i_trial, i_M, 1] = weights.max()
 
 # MMSE computation [<trial>, <number of particles>, <algorithm>]
 mmse = np.sum((estimates - true_means[np.newaxis, :, np.newaxis, np.newaxis])**2, axis=1)
@@ -139,6 +152,8 @@ file = h5py.File('res_' + output_file + '.hdf5', 'w')
 
 file.create_dataset('estimated means', shape=estimates.shape, data=estimates)
 file.create_dataset('true means', shape=true_means.shape, data=true_means)
+file.create_dataset('M_eff', shape=M_eff.shape, data=M_eff)
+file.create_dataset('maximum weight', shape=max_weight.shape, data=max_weight)
 
 file.attrs['number of particles'] = Ms
 

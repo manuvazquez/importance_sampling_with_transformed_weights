@@ -23,7 +23,7 @@ def setup_axes(figure_id, clear_figure=True):
 
 def mse(x, ys, output_file=None):
 
-	ax, fig = setup_axes('MMSE')
+	ax, fig = setup_axes('MSE')
 
 	for y, label, color, marker in zip(ys.T, ['plain IW', 'TIW'], ['black', 'blue'], ['s', 'o']):
 
@@ -33,7 +33,7 @@ def mse(x, ys, output_file=None):
 	ax.legend()
 
 	ax.set_xlabel('number of particles')
-	ax.set_ylabel('MMSE')
+	ax.set_ylabel('MSE')
 
 	fig.show()
 
@@ -62,3 +62,33 @@ def variance(x, ys, output_file=None):
 
 		plt.savefig(output_file)
 
+
+def max_weight(x, y, output_file=None):
+
+	ax, fig = setup_axes('max_weight')
+
+	ax.semilogx(x, y, label='IS', color='black', marker='s')
+
+	ax.set_xlabel('number of particles')
+	ax.set_ylabel('$max_i w^{(i)}$')
+
+	fig.show()
+
+	if output_file:
+
+		plt.savefig(output_file)
+
+def effective_sample_size(x, y, output_file=None):
+
+	ax, fig = setup_axes('effective_sample_size')
+
+	ax.loglog(x, y, label='IS', color='black', marker='s')
+
+	ax.set_xlabel('number of particles')
+	ax.set_ylabel('$M^{eff}$')
+
+	fig.show()
+
+	if output_file:
+
+		plt.savefig(output_file)
