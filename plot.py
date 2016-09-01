@@ -21,9 +21,9 @@ def setup_axes(figure_id, clear_figure=True):
 	return axes, fig
 
 
-def mse(x, ys, output_file=None):
+def plain_vs_tiw(x, ys, id, output_file=None, axes_properties={}):
 
-	ax, fig = setup_axes('MSE')
+	ax, fig = setup_axes(id)
 
 	for y, label, color, marker in zip(ys.T, ['plain IW', 'TIW'], ['black', 'blue'], ['s', 'o']):
 
@@ -32,8 +32,7 @@ def mse(x, ys, output_file=None):
 	# the labels are shown
 	ax.legend()
 
-	ax.set_xlabel('number of particles')
-	ax.set_ylabel('MSE')
+	ax.set(**axes_properties)
 
 	fig.show()
 

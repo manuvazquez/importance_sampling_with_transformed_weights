@@ -87,16 +87,22 @@ for i_trial in range(n_trials):
 	                     (1.0-ro)*np.exp(-(observations[:, np.newaxis]-samples[:, 1][np.newaxis, :])**2
 	                                     /(2*variance))/np.sqrt(2*np.pi*variance)
 
-	# the likelihood is given by the product of the individual factors
-	likelihood = likelihood_factors.prod(axis=0)
+	# in order to avoid underflows/overflows, we work with the logarithm of the likelihoods
+	log_likelihood_factors = np.log(likelihood_factors)
+
+	# the (log) likelihood is given by the (sum) product of the individual factors
+	log_likelihood = log_likelihood_factors.sum(axis=0)
 
 	for i_M, (M, M_T) in enumerate(zip(Ms, M_Ts_list)):
 
-		# the first "M" likelihoods...
-		M_likelihoods = likelihood[:M].copy()
+		# the first "M" log-likelihoods...
+		M_log_likelihoods = log_likelihood[:M].copy()
 		
 		# ...and samples are selected
 		M_samples = samples[:M, :]
+
+		# scaling followed by exponentiation to drop the logarithm
+		M_likelihoods = np.exp(M_log_likelihoods - M_log_likelihoods.max())
 
 		# weights are obtained by normalizing the likelihoods
 		weights = M_likelihoods / M_likelihoods.sum()
@@ -112,18 +118,21 @@ for i_trial in range(n_trials):
 
 		# --------------------- transformed importance weights
 
-		# NOTE: *M_likelihoods* is modified below
+		# NOTE: *M_log_likelihoods* is modified below
 
 		# clipping
-		i_clipped = np.argpartition(M_likelihoods, -M_T)[-M_T:]
+		i_clipped = np.argpartition(M_log_likelihoods, -M_T)[-M_T:]
 
 		# minimum (unnormalized) weight among those to be clipped
-		clipping_threshold = M_likelihoods[i_clipped[0]]
+		clipping_threshold = M_log_likelihoods[i_clipped[0]]
 
 		# the largest (unnormalized) weights are "clipped"
-		M_likelihoods[i_clipped] = clipping_threshold
+		M_log_likelihoods[i_clipped] = clipping_threshold
 
-		# normalized weights are obtained
+		# log is removed
+		M_likelihoods = np.exp(M_log_likelihoods - M_log_likelihoods.max())
+
+		# weights are obtained by normalizing the likelihoods
 		weights = M_likelihoods / M_likelihoods.sum()
 
 		#  TIW-based estimate
