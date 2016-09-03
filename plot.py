@@ -55,39 +55,22 @@ def variance(x, ys, output_file=None):
 	ax.legend()
 
 	ax.set_xlabel('number of particles')
-	ax.set_ylabel('variance')
+	ax.set_ylabel('variance estimates')
 
 	if output_file:
 
 		plt.savefig(output_file)
 
 
-def max_weight(x, y, output_file=None):
+def single_curve(x, y, id, output_file=None, axes_properties={}):
 
-	ax, fig = setup_axes('max_weight')
+	ax, fig = setup_axes(id)
 
-	ax.semilogx(x, y, label='IS', color='black', marker='s')
+	ax.plot(x, y, marker='s')
 
-	ax.set_xlabel('number of particles')
-	ax.set_ylabel('$max_i w^{(i)}$')
-
-	fig.show()
-
-	if output_file:
-
-		plt.savefig(output_file)
-
-def effective_sample_size(x, y, output_file=None):
-
-	ax, fig = setup_axes('effective_sample_size')
-
-	ax.loglog(x, y, label='IS', color='black', marker='s')
-
-	ax.set_xlabel('number of particles')
-	ax.set_ylabel('$M^{eff}$')
+	ax.set(**axes_properties)
 
 	fig.show()
 
 	if output_file:
-
 		plt.savefig(output_file)

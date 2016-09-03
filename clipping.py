@@ -4,7 +4,6 @@ import os
 import sys
 import json
 import pickle
-import types
 
 import h5py
 import colorama
@@ -18,7 +17,7 @@ import manu.util
 
 # --------------------- parameters are read
 
-with open('parameters.json') as json_data:
+with open('clipping.json') as json_data:
 
 	# the parameters file is read to memory
 	parameters = json.load(json_data)
@@ -31,28 +30,20 @@ ro = parameters["mixture coefficient"]
 N = parameters["number of observations"]
 
 # Monte Carlo
-Ms = parameters["Monte Carlo"]["number of particles"]
+M = parameters["Monte Carlo"]["number of particles"]
 nu = parameters["Monte Carlo"]["prior hyperparameters"]["nu"]
 lamb = parameters["Monte Carlo"]["prior hyperparameters"]["lambda"]
-n_clipped_particles_from_overall = eval(parameters["Monte Carlo"]["number of clipped particles from overall number"])
-
-# the above parameter should be a function
-assert isinstance(n_clipped_particles_from_overall, types.FunctionType)
 
 # if a random seed is not provided, this is None
 random_seed = parameters.get("random seed")
 
 # ---------------------
 
-# number of highest weights for the clipping procedure
-M_Ts_list = [n_clipped_particles_from_overall(M) for M in Ms]
+# number of particles *clipped* to be tested
+M_Ts = np.arange(1, int(M/2), 5)
 
 # [<trial>, <component within the state vector>, <number of particles>, <algorithm>]
-estimates = np.empty((n_trials, 2, len(Ms), 2))
-
-# [<trial>, <number of particles>, <algorithm>]
-M_eff = np.empty((n_trials, len(Ms), 2))
-max_weight = np.empty((n_trials, len(Ms), 2))
+estimates = np.empty((n_trials, 2, len(M_Ts)))
 
 # the proposal is a Gaussian density with parameters...
 proposal_mean, proposal_sd = nu, np.sqrt(variance/lamb)
@@ -74,11 +65,8 @@ for i_trial in range(n_trials):
 
 	observations = gmm.sample(n_samples=N, random_state=prng).flatten()
 
-	# the maximum number of particles
-	max_M = max(Ms)
-
 	# samples are drawn for every particle *and* every component (for the maximum number of particles required)
-	samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(max_M, 2))
+	samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(M, 2))
 
 	# computation of the factor every *individual* observations contributes to the likelihood
 	# (every row is associated with an observation, and every column with a particle)
@@ -93,65 +81,41 @@ for i_trial in range(n_trials):
 	# the (log) likelihood is given by the (sum) product of the individual factors
 	log_likelihood = log_likelihood_factors.sum(axis=0)
 
-	for i_M, (M, M_T) in enumerate(zip(Ms, M_Ts_list)):
+	for i_M_T, M_T in enumerate(M_Ts):
 
-		# the first "M" log-likelihoods...
-		M_log_likelihoods = log_likelihood[:M].copy()
-		
-		# ...and samples are selected
-		M_samples = samples[:M, :]
-
-		# scaling followed by exponentiation to drop the logarithm
-		M_likelihoods = np.exp(M_log_likelihoods - M_log_likelihoods.max())
-
-		# weights are obtained by normalizing the likelihoods
-		weights = M_likelihoods / M_likelihoods.sum()
-
-		# regular IW-based estimate
-		estimates[i_trial, :, i_M, 0] = weights @ M_samples
-
-		# effective sample size...
-		M_eff[i_trial, i_M, 0] = 1.0/np.sum(weights**2)
-
-		# ...and maximum weight
-		max_weight[i_trial, i_M, 0] = weights.max()
-
-		# --------------------- transformed importance weights
-
-		# NOTE: *M_log_likelihoods* is modified below
+		copy_log_likelihood = log_likelihood.copy()
 
 		# clipping
-		i_clipped = np.argpartition(M_log_likelihoods, -M_T)[-M_T:]
+		i_clipped = np.argpartition(copy_log_likelihood, -M_T)[-M_T:]
 
 		# minimum (unnormalized) weight among those to be clipped
-		clipping_threshold = M_log_likelihoods[i_clipped[0]]
+		clipping_threshold = copy_log_likelihood[i_clipped[0]]
 
 		# the largest (unnormalized) weights are "clipped"
-		M_log_likelihoods[i_clipped] = clipping_threshold
+		copy_log_likelihood[i_clipped] = clipping_threshold
 
 		# log is removed
-		M_likelihoods = np.exp(M_log_likelihoods - M_log_likelihoods.max())
+		likelihood = np.exp(copy_log_likelihood - copy_log_likelihood.max())
 
 		# weights are obtained by normalizing the likelihoods
-		weights = M_likelihoods / M_likelihoods.sum()
+		weights = likelihood / likelihood.sum()
 
 		#  TIW-based estimate
-		estimates[i_trial, :, i_M, 1] = weights @ M_samples
+		estimates[i_trial, :, i_M_T] = weights @ samples
 
-		# effective sample size and maximum weight
-		M_eff[i_trial, i_M, 1] = 1.0 / np.sum(weights ** 2)
-		max_weight[i_trial, i_M, 1] = weights.max()
-
-# MSE computation [<trial>, <number of particles>, <algorithm>]
-mse = np.sum((estimates - true_means[np.newaxis, :, np.newaxis, np.newaxis]) ** 2, axis=1)
+# MMSE computation [<trial>, <number of particles clipped>]
+mse = np.sum((estimates - true_means[np.newaxis, :, np.newaxis]) ** 2, axis=1)
 
 # [<number of particles>, <algorithm>]
 average_mse = mse.mean(axis=0)
 
-# variance [<component of the state vector>, <number of particles>, <algorithm>]
+# variance [<component of the state vector>, <number of particles>]
 estimates_variance = np.var(estimates, axis=0)
 
+mse_variance = np.var(mse, axis=0)
+
 print(average_mse)
+print(mse_variance)
 
 # --------------------- data saving
 
@@ -162,10 +126,8 @@ file = h5py.File('res_' + output_file + '.hdf5', 'w')
 
 file.create_dataset('estimated means', shape=estimates.shape, data=estimates)
 file.create_dataset('true means', shape=true_means.shape, data=true_means)
-file.create_dataset('M_eff', shape=M_eff.shape, data=M_eff)
-file.create_dataset('maximum weight', shape=max_weight.shape, data=max_weight)
 
-file.attrs['number of particles'] = Ms
+file.attrs['number of clipped particles'] = M_Ts
 
 if random_seed:
 
@@ -182,3 +144,16 @@ with open(parameters_file, mode='wb') as f:
 	pickle.dump(parameters, f)
 
 print('parameters saved in "{}"'.format(parameters_file))
+
+import plot
+plot.single_curve(
+	M_Ts, average_mse, 'mse',
+	axes_properties={'xlabel': '$M_T$', 'ylabel': 'MSE', 'yscale': 'log'},
+	output_file='average_mse_N={}_trials={}.pdf'.format(N, n_trials))
+plot.single_curve(
+	M_Ts, mse_variance, 'variance',
+	axes_properties={'xlabel': '$M_T$', 'ylabel': 'variance MSE', 'yscale': 'log'},
+	output_file='variance_mse_N={}_trials={}.pdf'.format(N, n_trials))
+
+import code
+code.interact(local=dict(globals(), **locals()))
