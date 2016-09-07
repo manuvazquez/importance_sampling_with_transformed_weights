@@ -1,6 +1,6 @@
 {
-	"number of trials": 100,
-	
+	"number of trials": 2,
+
 	"random seed": 123456,
 	
 	"true means": [0,2],
@@ -9,7 +9,9 @@
 	"number of observations": 100,
 	
 	"Monte Carlo": {
+		"number of trials": 100,
 		"number of particles": [10000],
+
 		"prior hyperparameters": {
 			"nu": 1,
 			"lambda": 0.1

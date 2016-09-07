@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 
 def setup_axes(figure_id, clear_figure=True):
@@ -67,6 +68,39 @@ def single_curve(x, y, id, output_file=None, axes_properties={}):
 	ax, fig = setup_axes(id)
 
 	ax.plot(x, y, marker='s')
+
+	ax.set(**axes_properties)
+
+	fig.show()
+
+	if output_file:
+		plt.savefig(output_file)
+
+
+def vs_two_variables_3d(x, y, z, output_file=None):
+
+	ax, fig = setup_axes('two')
+
+	ax = fig.gca(projection='3d')
+
+	ax.plot_surface(x, y, z)
+
+	fig.show()
+
+	if output_file:
+		plt.savefig(output_file)
+
+
+def vs_two_variables(x1, x2, ys, id, output_file=None, axes_properties={}):
+
+	ax, fig = setup_axes(id)
+
+	for y, color, N in zip(ys.T, ['blue', 'black', 'magenta', 'green', 'gray', 'brown'], x2):
+
+		ax.plot(x1, y, color=color, label='N = {}'.format(N))
+
+	# the labels are shown
+	ax.legend()
 
 	ax.set(**axes_properties)
 

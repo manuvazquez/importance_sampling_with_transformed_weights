@@ -32,6 +32,7 @@ N = parameters["number of observations"]
 
 # Monte Carlo
 Ms = parameters["Monte Carlo"]["number of particles"]
+n_monte_carlo_trials = parameters["Monte Carlo"]["number of trials"]
 nu = parameters["Monte Carlo"]["prior hyperparameters"]["nu"]
 lamb = parameters["Monte Carlo"]["prior hyperparameters"]["lambda"]
 n_clipped_particles_from_overall = eval(parameters["Monte Carlo"]["number of clipped particles from overall number"])
@@ -44,15 +45,18 @@ random_seed = parameters.get("random seed")
 
 # ---------------------
 
+# the maximum number of particles
+max_M = max(Ms)
+
 # number of highest weights for the clipping procedure
 M_Ts_list = [n_clipped_particles_from_overall(M) for M in Ms]
 
 # [<trial>, <component within the state vector>, <number of particles>, <algorithm>]
-estimates = np.empty((n_trials, 2, len(Ms), 2))
+estimates = np.empty((n_trials, n_monte_carlo_trials, 2, len(Ms), 2))
 
 # [<trial>, <number of particles>, <algorithm>]
-M_eff = np.empty((n_trials, len(Ms), 2))
-max_weight = np.empty((n_trials, len(Ms), 2))
+M_eff = np.empty((n_trials, n_monte_carlo_trials, len(Ms), 2))
+max_weight = np.empty((n_trials, n_monte_carlo_trials, len(Ms), 2))
 
 # the proposal is a Gaussian density with parameters...
 proposal_mean, proposal_sd = nu, np.sqrt(variance/lamb)
@@ -70,88 +74,77 @@ gmm.weights_ = np.array([ro, 1-ro])
 
 for i_trial in range(n_trials):
 
-	print('trial ' + colorama.Fore.LIGHTWHITE_EX + '{}'.format(i_trial) + colorama.Style.RESET_ALL)
-
 	observations = gmm.sample(n_samples=N, random_state=prng).flatten()
 
-	# the maximum number of particles
-	max_M = max(Ms)
+	for i_monte_carlo_trial in range(n_monte_carlo_trials):
 
-	# samples are drawn for every particle *and* every component (for the maximum number of particles required)
-	samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(max_M, 2))
+		print('trial ' + colorama.Fore.LIGHTWHITE_EX + '{}'.format(i_trial) + colorama.Style.RESET_ALL + ' | ' +
+			'MC trial ' + colorama.Fore.LIGHTGREEN_EX + '{}'.format(i_monte_carlo_trial) + colorama.Style.RESET_ALL)
 
-	# computation of the factor every *individual* observations contributes to the likelihood
-	# (every row is associated with an observation, and every column with a particle)
-	likelihood_factors = ro*np.exp(-(observations[:, np.newaxis]-samples[:, 0][np.newaxis, :])**2
-	                               /(2*variance))/np.sqrt(2*np.pi*variance) + \
-	                     (1.0-ro)*np.exp(-(observations[:, np.newaxis]-samples[:, 1][np.newaxis, :])**2
-	                                     /(2*variance))/np.sqrt(2*np.pi*variance)
+		# samples are drawn for every particle *and* every component (for the maximum number of particles required)
+		samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(max_M, 2))
 
-	# in order to avoid underflows/overflows, we work with the logarithm of the likelihoods
-	log_likelihood_factors = np.log(likelihood_factors)
+		# computation of the factor every *individual* observations contributes to the likelihood
+		# (every row is associated with an observation, and every column with a particle)
+		likelihood_factors = ro*np.exp(-(observations[:, np.newaxis]-samples[:, 0][np.newaxis, :])**2
+		                               /(2*variance))/np.sqrt(2*np.pi*variance) + \
+		                     (1.0-ro)*np.exp(-(observations[:, np.newaxis]-samples[:, 1][np.newaxis, :])**2
+		                                     /(2*variance))/np.sqrt(2*np.pi*variance)
 
-	# the (log) likelihood is given by the (sum) product of the individual factors
-	log_likelihood = log_likelihood_factors.sum(axis=0)
+		# in order to avoid underflows/overflows, we work with the logarithm of the likelihoods
+		log_likelihood_factors = np.log(likelihood_factors)
 
-	for i_M, (M, M_T) in enumerate(zip(Ms, M_Ts_list)):
+		# the (log) likelihood is given by the (sum) product of the individual factors
+		log_likelihood = log_likelihood_factors.sum(axis=0)
 
-		# the first "M" log-likelihoods...
-		M_log_likelihoods = log_likelihood[:M].copy()
-		
-		# ...and samples are selected
-		M_samples = samples[:M, :]
+		for i_M, (M, M_T) in enumerate(zip(Ms, M_Ts_list)):
 
-		# scaling followed by exponentiation to drop the logarithm
-		M_likelihoods = np.exp(M_log_likelihoods - M_log_likelihoods.max())
+			# the first "M" log-likelihoods...
+			M_log_likelihoods = log_likelihood[:M].copy()
 
-		# weights are obtained by normalizing the likelihoods
-		weights = M_likelihoods / M_likelihoods.sum()
+			# ...and samples are selected
+			M_samples = samples[:M, :]
 
-		# regular IW-based estimate
-		estimates[i_trial, :, i_M, 0] = weights @ M_samples
+			# scaling followed by exponentiation to drop the logarithm
+			M_likelihoods = np.exp(M_log_likelihoods - M_log_likelihoods.max())
 
-		# effective sample size...
-		M_eff[i_trial, i_M, 0] = 1.0/np.sum(weights**2)
+			# weights are obtained by normalizing the likelihoods
+			weights = M_likelihoods / M_likelihoods.sum()
 
-		# ...and maximum weight
-		max_weight[i_trial, i_M, 0] = weights.max()
+			# regular IW-based estimate
+			estimates[i_trial, i_monte_carlo_trial, :, i_M, 0] = weights @ M_samples
 
-		# --------------------- transformed importance weights
+			# effective sample size...
+			M_eff[i_trial, i_monte_carlo_trial, i_M, 0] = 1.0/np.sum(weights**2)
 
-		# NOTE: *M_log_likelihoods* is modified below
+			# ...and maximum weight
+			max_weight[i_trial, i_monte_carlo_trial, i_M, 0] = weights.max()
 
-		# clipping
-		i_clipped = np.argpartition(M_log_likelihoods, -M_T)[-M_T:]
+			# --------------------- transformed importance weights
 
-		# minimum (unnormalized) weight among those to be clipped
-		clipping_threshold = M_log_likelihoods[i_clipped[0]]
+			# NOTE: *M_log_likelihoods* is modified below
 
-		# the largest (unnormalized) weights are "clipped"
-		M_log_likelihoods[i_clipped] = clipping_threshold
+			# clipping
+			i_clipped = np.argpartition(M_log_likelihoods, -M_T)[-M_T:]
 
-		# log is removed
-		M_likelihoods = np.exp(M_log_likelihoods - M_log_likelihoods.max())
+			# minimum (unnormalized) weight among those to be clipped
+			clipping_threshold = M_log_likelihoods[i_clipped[0]]
 
-		# weights are obtained by normalizing the likelihoods
-		weights = M_likelihoods / M_likelihoods.sum()
+			# the largest (unnormalized) weights are "clipped"
+			M_log_likelihoods[i_clipped] = clipping_threshold
 
-		#  TIW-based estimate
-		estimates[i_trial, :, i_M, 1] = weights @ M_samples
+			# log is removed
+			M_likelihoods = np.exp(M_log_likelihoods - M_log_likelihoods.max())
 
-		# effective sample size and maximum weight
-		M_eff[i_trial, i_M, 1] = 1.0 / np.sum(weights ** 2)
-		max_weight[i_trial, i_M, 1] = weights.max()
+			# weights are obtained by normalizing the likelihoods
+			weights = M_likelihoods / M_likelihoods.sum()
 
-# MSE computation [<trial>, <number of particles>, <algorithm>]
-mse = np.sum((estimates - true_means[np.newaxis, :, np.newaxis, np.newaxis]) ** 2, axis=1)
+			#  TIW-based estimate
+			estimates[i_trial, i_monte_carlo_trial, :, i_M, 1] = weights @ M_samples
 
-# [<number of particles>, <algorithm>]
-average_mse = mse.mean(axis=0)
-
-# variance [<component of the state vector>, <number of particles>, <algorithm>]
-estimates_variance = np.var(estimates, axis=0)
-
-print(average_mse)
+			# effective sample size and maximum weight
+			M_eff[i_trial, i_monte_carlo_trial, i_M, 1] = 1.0 / np.sum(weights ** 2)
+			max_weight[i_trial, i_monte_carlo_trial, i_M, 1] = weights.max()
 
 # --------------------- data saving
 

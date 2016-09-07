@@ -129,7 +129,7 @@ file.create_dataset('estimated means', shape=estimates.shape, data=estimates)
 file.create_dataset('true means', shape=true_means.shape, data=true_means)
 
 file.attrs['number of clipped particles'] = M_Ts
-file.attrs['number of clipped particles'] = Ns
+file.attrs['number of observations'] = Ns
 
 if random_seed:
 
