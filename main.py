@@ -27,7 +27,7 @@ n_trials = parameters["number of trials"]
 
 true_means = np.array(parameters["true means"])
 variance = parameters["variance"]  # variance of *both* Gaussians (known)
-ro = parameters["mixture coefficient"]
+mixture_coefficients = np.array(parameters["mixture coefficients"])
 N = parameters["number of observations"]
 
 # Monte Carlo
@@ -37,22 +37,32 @@ nu = parameters["Monte Carlo"]["prior hyperparameters"]["nu"]
 lamb = parameters["Monte Carlo"]["prior hyperparameters"]["lambda"]
 n_clipped_particles_from_overall = eval(parameters["Monte Carlo"]["number of clipped particles from overall number"])
 
-# the above parameter should be a function
-assert isinstance(n_clipped_particles_from_overall, types.FunctionType)
-
 # if a random seed is not provided, this is None
 random_seed = parameters.get("random seed")
 
 # ---------------------
 
+# the number of components
+n_mixture_components = len(mixture_coefficients)
+
 # the maximum number of particles
 max_M = max(Ms)
+
+# the parameter below should be a function
+assert isinstance(n_clipped_particles_from_overall, types.FunctionType)
+
+# there should be one mixture coefficient per mean
+assert len(true_means) == n_mixture_components
+
+# bad things can happen when computing "likelihood_factors" if these don't hold due to numpy's "broadcasting rules"
+assert n_mixture_components != N
+assert n_mixture_components != max_M
 
 # number of highest weights for the clipping procedure
 M_Ts_list = [n_clipped_particles_from_overall(M) for M in Ms]
 
 # [<trial>, <component within the state vector>, <number of particles>, <algorithm>]
-estimates = np.empty((n_trials, n_monte_carlo_trials, 2, len(Ms), 2))
+estimates = np.empty((n_trials, n_monte_carlo_trials, n_mixture_components, len(Ms), 2))
 
 # [<trial>, <number of particles>, <algorithm>]
 M_eff = np.empty((n_trials, n_monte_carlo_trials, len(Ms), 2))
@@ -65,12 +75,12 @@ proposal_mean, proposal_sd = nu, np.sqrt(variance/lamb)
 prng = np.random.RandomState(random_seed)
 
 # a Gaussian Mixture Model is built...
-gmm = GMM(n_components=2, random_state=prng, n_iter=1)
+gmm = GMM(n_components=n_mixture_components, random_state=prng, n_iter=1)
 
 # ...and the required parameters set up
 gmm.means_ = np.reshape(true_means, (-1, 1))
-gmm.covars_ = np.full(shape=(2, 1), fill_value=variance, dtype=float)
-gmm.weights_ = np.array([ro, 1-ro])
+gmm.covars_ = np.full(shape=(n_mixture_components, 1), fill_value=variance, dtype=float)
+gmm.weights_ = mixture_coefficients
 
 for i_trial in range(n_trials):
 
@@ -82,7 +92,7 @@ for i_trial in range(n_trials):
 			'MC trial ' + colorama.Fore.LIGHTGREEN_EX + '{}'.format(i_monte_carlo_trial) + colorama.Style.RESET_ALL)
 
 		# samples are drawn for every particle *and* every component (for the maximum number of particles required)
-		samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(max_M, 2))
+		samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(max_M, n_mixture_components))
 
 		# intermediate result for computating the factor every *individual* observations contributes to the likelihood
 		# [<observation>, <particle>, <component>]
@@ -90,7 +100,10 @@ for i_trial in range(n_trials):
 			-(observations[:, np.newaxis, np.newaxis] - samples[np.newaxis, :, :])**2 / (2 * variance)
 		) /np.sqrt(2*np.pi*variance)
 
-		likelihood_factors = ro*aux_likelihood_factors[..., 0] + (1.0-ro)*aux_likelihood_factors[..., 1]
+		likelihood_factors = np.sum(mixture_coefficients * aux_likelihood_factors, axis=-1)
+
+		# import code
+		# code.interact(local=dict(globals(), **locals()))
 
 		# in order to avoid underflows/overflows, we work with the logarithm of the likelihoods
 		log_likelihood_factors = np.log(likelihood_factors)
@@ -146,6 +159,7 @@ for i_trial in range(n_trials):
 			# effective sample size and maximum weight
 			M_eff[i_trial, i_monte_carlo_trial, i_M, 1] = 1.0 / np.sum(weights ** 2)
 			max_weight[i_trial, i_monte_carlo_trial, i_M, 1] = weights.max()
+
 
 # --------------------- data saving
 

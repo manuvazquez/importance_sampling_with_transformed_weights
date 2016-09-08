@@ -5,7 +5,7 @@
 	
 	"true means": [0,2],
 	"variance": 1,
-	"mixture coefficient": 0.2,
+	"mixture coefficients": [0.2, 0.8],
 	"number of observations": 100,
 	
 	"Monte Carlo": {
