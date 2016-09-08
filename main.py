@@ -84,12 +84,13 @@ for i_trial in range(n_trials):
 		# samples are drawn for every particle *and* every component (for the maximum number of particles required)
 		samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(max_M, 2))
 
-		# computation of the factor every *individual* observations contributes to the likelihood
-		# (every row is associated with an observation, and every column with a particle)
-		likelihood_factors = ro*np.exp(-(observations[:, np.newaxis]-samples[:, 0][np.newaxis, :])**2
-		                               /(2*variance))/np.sqrt(2*np.pi*variance) + \
-		                     (1.0-ro)*np.exp(-(observations[:, np.newaxis]-samples[:, 1][np.newaxis, :])**2
-		                                     /(2*variance))/np.sqrt(2*np.pi*variance)
+		# intermediate result for computating the factor every *individual* observations contributes to the likelihood
+		# [<observation>, <particle>, <component>]
+		aux_likelihood_factors = np.exp(
+			-(observations[:, np.newaxis, np.newaxis] - samples[np.newaxis, :, :])**2 / (2 * variance)
+		) /np.sqrt(2*np.pi*variance)
+
+		likelihood_factors = ro*aux_likelihood_factors[..., 0] + (1.0-ro)*aux_likelihood_factors[..., 1]
 
 		# in order to avoid underflows/overflows, we work with the logarithm of the likelihoods
 		log_likelihood_factors = np.log(likelihood_factors)
