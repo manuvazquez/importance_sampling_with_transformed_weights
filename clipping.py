@@ -4,6 +4,7 @@ import os
 import sys
 import json
 import pickle
+import types
 
 import h5py
 import colorama
@@ -26,24 +27,39 @@ n_trials = parameters["number of trials"]
 
 true_means = np.array(parameters["true means"])
 variance = parameters["variance"]  # variance of *both* Gaussians (known)
-ro = parameters["mixture coefficient"]
+mixture_coefficients = np.array(parameters["mixture coefficients"])
 Ns = parameters["number of observations"]
 
 # Monte Carlo
 M = parameters["Monte Carlo"]["number of particles"]
+n_monte_carlo_trials = parameters["Monte Carlo"]["number of trials"]
 nu = parameters["Monte Carlo"]["prior hyperparameters"]["nu"]
 lamb = parameters["Monte Carlo"]["prior hyperparameters"]["lambda"]
+M_Ts_list = parameters["Monte Carlo"]["number of particles clipped"]
 
 # if a random seed is not provided, this is None
 random_seed = parameters.get("random seed")
 
 # ---------------------
 
-# number of particles *clipped* to be tested
-M_Ts = np.arange(1, int(M/2), 5)
+max_N = max(Ns)
 
-# [<trial>, <component within the state vector>, <number of clipped particles>, <number of observations>]
-estimates = np.empty((n_trials, 2, len(M_Ts), len(Ns)))
+# the number of components
+n_mixture_components = len(mixture_coefficients)
+
+# there should be one mixture coefficient per mean
+assert len(true_means) == n_mixture_components
+
+# bad things can happen when computing "likelihood_factors" if these don't hold due to numpy's "broadcasting rules"
+assert n_mixture_components != max_N
+assert n_mixture_components != M
+
+# [<trial>, <component within the state vector>, <number of particles>, <algorithm>]
+estimates = np.empty((n_trials, n_monte_carlo_trials, n_mixture_components, len(M_Ts_list), len(Ns)))
+
+# [<trial>, <number of particles>, <algorithm>]
+M_eff = np.empty((n_trials, n_monte_carlo_trials, len(M_Ts_list), len(Ns)))
+max_weight = np.empty((n_trials, n_monte_carlo_trials, len(M_Ts_list), len(Ns)))
 
 # the proposal is a Gaussian density with parameters...
 proposal_mean, proposal_sd = nu, np.sqrt(variance/lamb)
@@ -52,71 +68,71 @@ proposal_mean, proposal_sd = nu, np.sqrt(variance/lamb)
 prng = np.random.RandomState(random_seed)
 
 # a Gaussian Mixture Model is built...
-gmm = GMM(n_components=2, random_state=prng, n_iter=1)
+gmm = GMM(n_components=n_mixture_components, random_state=prng, n_iter=1)
 
 # ...and the required parameters set up
 gmm.means_ = np.reshape(true_means, (-1, 1))
-gmm.covars_ = np.full(shape=(2, 1), fill_value=variance, dtype=float)
-gmm.weights_ = np.array([ro, 1-ro])
+gmm.covars_ = np.full(shape=(n_mixture_components, 1), fill_value=variance, dtype=float)
+gmm.weights_ = mixture_coefficients
 
 for i_trial in range(n_trials):
 
-	print('trial ' + colorama.Fore.LIGHTWHITE_EX + '{}'.format(i_trial) + colorama.Style.RESET_ALL)
+	observations = gmm.sample(n_samples=max_N, random_state=prng).flatten()
 
 	for i_N, N in enumerate(Ns):
 
-		observations = gmm.sample(n_samples=N, random_state=prng).flatten()
+		for i_monte_carlo_trial in range(n_monte_carlo_trials):
 
-		# samples are drawn for every particle *and* every component (for the maximum number of particles required)
-		samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(M, 2))
+			print('trial ' + colorama.Fore.LIGHTWHITE_EX + '{}'.format(i_trial) + colorama.Style.RESET_ALL + ' | ' +
+			      'N ' + colorama.Fore.LIGHTBLUE_EX + '{}'.format(N) + colorama.Style.RESET_ALL + ' | ' +
+				'MC trial ' + colorama.Fore.LIGHTGREEN_EX + '{}'.format(i_monte_carlo_trial) + colorama.Style.RESET_ALL)
 
-		# computation of the factor every *individual* observations contributes to the likelihood
-		# (every row is associated with an observation, and every column with a particle)
-		likelihood_factors = ro*np.exp(-(observations[:, np.newaxis]-samples[:, 0][np.newaxis, :])**2
-		                               /(2*variance))/np.sqrt(2*np.pi*variance) + \
-		                     (1.0-ro)*np.exp(-(observations[:, np.newaxis]-samples[:, 1][np.newaxis, :])**2
-		                                     /(2*variance))/np.sqrt(2*np.pi*variance)
+			# samples are drawn for every particle *and* every component (for the maximum number of particles required)
+			samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(M, n_mixture_components))
 
-		# in order to avoid underflows/overflows, we work with the logarithm of the likelihoods
-		log_likelihood_factors = np.log(likelihood_factors)
+			# intermediate result for computating the factor every *individual* observations contributes to the likelihood
+			# [<observation>, <particle>, <component>]
+			aux_likelihood_factors = np.exp(
+				-(observations[:N, np.newaxis, np.newaxis] - samples[np.newaxis, :, :])**2 / (2 * variance)
+			) /np.sqrt(2*np.pi*variance)
 
-		# the (log) likelihood is given by the (sum) product of the individual factors
-		log_likelihood = log_likelihood_factors.sum(axis=0)
+			likelihood_factors = np.sum(mixture_coefficients * aux_likelihood_factors, axis=-1)
 
-		for i_M_T, M_T in enumerate(M_Ts):
+			# in order to avoid underflows/overflows, we work with the logarithm of the likelihoods
+			log_likelihood_factors = np.log(likelihood_factors)
 
-			copy_log_likelihood = log_likelihood.copy()
+			# the (log) likelihood is given by the (sum) product of the individual factors
+			log_likelihood = log_likelihood_factors.sum(axis=0)
 
-			# clipping
-			i_clipped = np.argpartition(copy_log_likelihood, -M_T)[-M_T:]
+			for i_M_T, M_T in enumerate(M_Ts_list):
 
-			# minimum (unnormalized) weight among those to be clipped
-			clipping_threshold = copy_log_likelihood[i_clipped[0]]
+				# the first "M" log-likelihoods...
+				copy_log_likelihoods = log_likelihood.copy()
 
-			# the largest (unnormalized) weights are "clipped"
-			copy_log_likelihood[i_clipped] = clipping_threshold
+				# clipping
+				i_clipped = np.argpartition(copy_log_likelihoods, -M_T)[-M_T:]
 
-			# log is removed
-			likelihood = np.exp(copy_log_likelihood - copy_log_likelihood.max())
+				# minimum (unnormalized) weight among those to be clipped
+				clipping_threshold = copy_log_likelihoods[i_clipped[0]]
 
-			# weights are obtained by normalizing the likelihoods
-			weights = likelihood / likelihood.sum()
+				# the largest (unnormalized) weights are "clipped"
+				copy_log_likelihoods[i_clipped] = clipping_threshold
 
-			#  TIW-based estimate
-			estimates[i_trial, :, i_M_T, i_N] = weights @ samples
+				# log is removed
+				likelihoods = np.exp(copy_log_likelihoods - copy_log_likelihoods.max())
 
-# MSE computation [<trial>, <number of clipped particles>, <number of observations>]
-mse = np.sum((estimates - true_means[np.newaxis, :, np.newaxis, np.newaxis]) ** 2, axis=1)
+				# weights are obtained by normalizing the likelihoods
+				weights = likelihoods / likelihoods.sum()
 
-# [<number of clipped particles>, <number of observations>]
-average_mse = mse.mean(axis=0)
-variance_mse = np.var(mse, axis=0)
+				# TIW-based estimate
+				estimates[i_trial, i_monte_carlo_trial, :, i_M_T, i_N] = weights @ samples
 
-# [<component within the state vector>, <number of clipped particles>, <number of observations>]
-estimates_variance = np.var(estimates, axis=0)
+				# effective sample size...
+				M_eff[i_trial, i_monte_carlo_trial, i_M_T, i_N] = 1.0/np.sum(weights**2)
 
-print(average_mse)
-print(variance_mse)
+				# ...and maximum weight
+				max_weight[i_trial, i_monte_carlo_trial, i_M_T, i_N] = weights.max()
+
 
 # --------------------- data saving
 
@@ -127,9 +143,11 @@ file = h5py.File('res_' + output_file + '.hdf5', 'w')
 
 file.create_dataset('estimated means', shape=estimates.shape, data=estimates)
 file.create_dataset('true means', shape=true_means.shape, data=true_means)
+file.create_dataset('M_eff', shape=M_eff.shape, data=M_eff)
+file.create_dataset('maximum weight', shape=max_weight.shape, data=max_weight)
 
-file.attrs['number of clipped particles'] = M_Ts
-file.attrs['number of observations'] = Ns
+file.attrs['number of particles'] = M
+file.attrs['M_Ts'] = M_Ts_list
 
 if random_seed:
 
@@ -146,16 +164,3 @@ with open(parameters_file, mode='wb') as f:
 	pickle.dump(parameters, f)
 
 print('parameters saved in "{}"'.format(parameters_file))
-
-# import plot
-# plot.single_curve(
-# 	M_Ts, average_mse, 'mse',
-# 	axes_properties={'xlabel': '$M_T$', 'ylabel': 'MSE', 'yscale': 'log'},
-# 	output_file='average_mse_N={}_trials={}.pdf'.format(N, n_trials))
-# plot.single_curve(
-# 	M_Ts, variance_mse, 'variance',
-# 	axes_properties={'xlabel': '$M_T$', 'ylabel': 'variance MSE', 'yscale': 'log'},
-# 	output_file='variance_mse_N={}_trials={}.pdf'.format(N, n_trials))
-
-# import code
-# code.interact(local=dict(globals(), **locals()))
