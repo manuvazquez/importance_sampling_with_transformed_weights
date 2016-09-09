@@ -174,6 +174,7 @@ file.create_dataset('M_eff', shape=M_eff.shape, data=M_eff)
 file.create_dataset('maximum weight', shape=max_weight.shape, data=max_weight)
 
 file.attrs['number of particles'] = Ms
+file.attrs['M_Ts'] = M_Ts_list
 
 if random_seed:
 

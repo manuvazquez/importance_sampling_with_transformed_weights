@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 from mpl_toolkits.mplot3d import Axes3D
 
 
@@ -22,13 +23,13 @@ def setup_axes(figure_id, clear_figure=True):
 	return axes, fig
 
 
-def plain_vs_tiw(x, ys, id, output_file=None, axes_properties={}):
+def plain_vs_tiw(x, ys, parameters, id, output_file=None, axes_properties={}):
 
 	ax, fig = setup_axes(id)
 
-	for y, label, color, marker in zip(ys.T, ['plain IW', 'TIW'], ['black', 'blue'], ['s', 'o']):
+	for y, parameters in zip(ys.T, parameters):
 
-		ax.loglog(x, y, label=label, color=color, marker=marker)
+		ax.loglog(x, y, **parameters)
 
 	# the labels are shown
 	ax.legend()
@@ -40,6 +41,43 @@ def plain_vs_tiw(x, ys, id, output_file=None, axes_properties={}):
 	if output_file:
 
 		plt.savefig(output_file)
+
+	return ax, fig
+
+
+def plain_vs_tiw_with_max_weight(x, ys, max_weight, parameters, id, output_file=None, axes_properties={}):
+
+	parameters_without_labels = [{k: par[k] for k in par if k!='label'} for par in parameters]
+	for par in parameters_without_labels:
+		par['marker'] = 'None'
+
+	ax, fig = plain_vs_tiw(x, ys, parameters_without_labels, id, output_file=None, axes_properties=axes_properties)
+
+	cm = plt.cm.get_cmap('RdYlBu_r')
+
+	leg = []
+
+	for y, w, par in zip(ys.T, max_weight.T, parameters):
+
+		leg.append(matplotlib.lines.Line2D(
+			[], [], color=par['color'], marker=par['marker'], markersize=8, markerfacecolor='None',
+			markeredgecolor=par['color'], label=par['label']))
+
+		sc = ax.scatter(x, y, c=w, cmap=cm, s=70, marker=par['marker'])
+
+	ax.legend(handles=leg)
+
+	# the x axis is adjusted so that no empty space is left before the beginning of the plot
+	ax.set_xbound(lower=x[0], upper=x[-1])
+
+	fig.colorbar(sc)
+	fig.show()
+
+	if output_file:
+
+		plt.savefig(output_file)
+
+	return ax, fig
 
 
 def variance(x, ys, output_file=None):
