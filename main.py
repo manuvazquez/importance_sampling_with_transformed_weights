@@ -12,6 +12,8 @@ import colorama
 import numpy as np
 from sklearn.mixture import GMM
 
+import numba
+
 sys.path.append(os.path.join(os.environ['HOME'], 'python'))
 
 import manu.util
@@ -82,6 +84,32 @@ gmm.means_ = np.reshape(true_means, (-1, 1))
 gmm.covars_ = np.full(shape=(n_mixture_components, 1), fill_value=variance, dtype=float)
 gmm.weights_ = mixture_coefficients
 
+
+@numba.jit(numba.float64[:](numba.float64[:, :], numba.float64[:]), nopython=True)
+def compute_loglikelihoods(samp, obs):
+
+	res = np.empty(max_M)
+
+	for i_sample in range(max_M):
+
+		loglikelihood = 0.0
+
+		for i_obs in range(N):
+
+			addend = 0.0
+
+			for i_component in range(n_mixture_components):
+
+				addend += np.exp(
+					-(obs[i_obs] - samp[i_sample, i_component])**2/(2 * variance)
+				)/np.sqrt(2*np.pi*variance) * mixture_coefficients[i_component]
+
+			loglikelihood += np.log(addend)
+
+		res[i_sample] = loglikelihood
+
+	return res
+
 for i_trial in range(n_trials):
 
 	observations = gmm.sample(n_samples=N, random_state=prng).flatten()
@@ -94,22 +122,8 @@ for i_trial in range(n_trials):
 		# samples are drawn for every particle *and* every component (for the maximum number of particles required)
 		samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(max_M, n_mixture_components))
 
-		# intermediate result for computating the factor every *individual* observations contributes to the likelihood
-		# [<observation>, <particle>, <component>]
-		aux_likelihood_factors = np.exp(
-			-(observations[:, np.newaxis, np.newaxis] - samples[np.newaxis, :, :])**2 / (2 * variance)
-		) /np.sqrt(2*np.pi*variance)
-
-		likelihood_factors = np.sum(mixture_coefficients * aux_likelihood_factors, axis=-1)
-
-		# import code
-		# code.interact(local=dict(globals(), **locals()))
-
-		# in order to avoid underflows/overflows, we work with the logarithm of the likelihoods
-		log_likelihood_factors = np.log(likelihood_factors)
-
-		# the (log) likelihood is given by the (sum) product of the individual factors
-		log_likelihood = log_likelihood_factors.sum(axis=0)
+		# the log likelihood of every sample is computed
+		log_likelihood = compute_loglikelihoods(samples, observations)
 
 		for i_M, (M, M_T) in enumerate(zip(Ms, M_Ts_list)):
 
@@ -160,6 +174,8 @@ for i_trial in range(n_trials):
 			M_eff[i_trial, i_monte_carlo_trial, i_M, 1] = 1.0 / np.sum(weights ** 2)
 			max_weight[i_trial, i_monte_carlo_trial, i_M, 1] = weights.max()
 
+
+print(estimates)
 
 # --------------------- data saving
 
