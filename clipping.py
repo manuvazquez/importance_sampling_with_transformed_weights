@@ -12,9 +12,7 @@ import colorama
 import numpy as np
 from sklearn.mixture import GMM
 
-sys.path.append(os.path.join(os.environ['HOME'], 'python'))
-
-import manu.util
+import util
 
 # --------------------- parameters are read
 
@@ -134,33 +132,6 @@ for i_trial in range(n_trials):
 				max_weight[i_trial, i_monte_carlo_trial, i_M_T, i_N] = weights.max()
 
 
-# --------------------- data saving
-
-# output data file
-output_file = manu.util.filename_from_host_and_date()
-
-file = h5py.File('res_' + output_file + '.hdf5', 'w')
-
-file.create_dataset('estimated means', shape=estimates.shape, data=estimates)
-file.create_dataset('true means', shape=true_means.shape, data=true_means)
-file.create_dataset('M_eff', shape=M_eff.shape, data=M_eff)
-file.create_dataset('maximum weight', shape=max_weight.shape, data=max_weight)
-
-file.attrs['number of particles'] = M
-file.attrs['M_Ts'] = M_Ts_list
-
-if random_seed:
-
-	file.attrs['random seed'] = random_seed
-
-file.close()
-
-# in a separate file with the same name as the data file but different extension...
-parameters_file = 'res_{}.parameters'.format(output_file)
-
-with open(parameters_file, mode='wb') as f:
-
-	#  ...parameters are pickled
-	pickle.dump(parameters, f)
-
-print('parameters saved in "{}"'.format(parameters_file))
+# data saving
+util.save_data(parameters, estimates, true_means, M_eff, max_weight, random_seed, {
+	'number of particles': M, 'M_Ts': M_Ts_list})
