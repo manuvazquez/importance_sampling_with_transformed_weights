@@ -1,0 +1,24 @@
+{
+	"number of trials": 2,
+
+	"random seed": 123456,
+	
+	"true means": [0,2,4],
+	"variance": 1,
+	"mixture coefficients": [0.2, 0.3, 0.5],
+	"number of observations": 1000,
+	
+	"Monte Carlo": {
+		"number of trials": 100,
+		"number of particles": 10000,
+
+		"number of PMC iterations": 10,
+
+		"prior hyperparameters": {
+			"nu": 1,
+			"lambda": 0.1
+		},
+
+		"number of clipped particles from overall number": "lambda x: int(x/10)"
+	}
+}
