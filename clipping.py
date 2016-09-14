@@ -1,12 +1,7 @@
 #! /usr/bin/env python3
 
-import os
-import sys
 import json
-import pickle
-import types
 
-import h5py
 import colorama
 
 import numpy as np
@@ -88,19 +83,8 @@ for i_trial in range(n_trials):
 			# samples are drawn for every particle *and* every component (for the maximum number of particles required)
 			samples = prng.normal(loc=proposal_mean, scale=proposal_sd, size=(M, n_mixture_components))
 
-			# intermediate result for computating the factor every *individual* observations contributes to the likelihood
-			# [<observation>, <particle>, <component>]
-			aux_likelihood_factors = np.exp(
-				-(observations[:N, np.newaxis, np.newaxis] - samples[np.newaxis, :, :])**2 / (2 * variance)
-			) /np.sqrt(2*np.pi*variance)
-
-			likelihood_factors = np.sum(mixture_coefficients * aux_likelihood_factors, axis=-1)
-
-			# in order to avoid underflows/overflows, we work with the logarithm of the likelihoods
-			log_likelihood_factors = np.log(likelihood_factors)
-
-			# the (log) likelihood is given by the (sum) product of the individual factors
-			log_likelihood = log_likelihood_factors.sum(axis=0)
+			# the log likelihood of every sample is computed
+			log_likelihood = util.compute_loglikelihoods(samples, observations[:N], mixture_coefficients, variance)
 
 			for i_M_T, M_T in enumerate(M_Ts_list):
 

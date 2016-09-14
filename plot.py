@@ -63,14 +63,18 @@ def plain_vs_tiw_with_max_weight(x, ys, max_weight, parameters, id, output_file=
 			[], [], color=par['color'], marker=par['marker'], markersize=8, markerfacecolor='None',
 			markeredgecolor=par['color'], label=par['label']))
 
-		sc = ax.scatter(x, y, c=w, cmap=cm, s=70, marker=par['marker'])
+		sc = ax.scatter(x, y, c=w, cmap=cm, s=70, marker=par['marker'], vmin=0, vmax=1)
 
 	ax.legend(handles=leg)
 
 	# the x axis is adjusted so that no empty space is left before the beginning of the plot
 	ax.set_xbound(lower=x[0], upper=x[-1])
 
-	fig.colorbar(sc)
+	color_bar = fig.colorbar(sc)
+
+	# label for the color bar
+	color_bar.ax.set_ylabel('$\max_i \\bar w^{(i)}$', labelpad=25, rotation=0)
+
 	fig.show()
 
 	if output_file:
