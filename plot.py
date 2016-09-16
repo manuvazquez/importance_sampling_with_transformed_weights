@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
-from mpl_toolkits.mplot3d import Axes3D
 
 
 def setup_axes(figure_id, clear_figure=True):
@@ -23,9 +22,7 @@ def setup_axes(figure_id, clear_figure=True):
 	return axes, fig
 
 
-def plain_vs_tiw(x, ys, parameters, id, output_file=None, axes_properties={}):
-
-	ax, fig = setup_axes(id)
+def plain_vs_tiw_aux(ax, x, ys, parameters, axes_properties={}):
 
 	for y, parameters in zip(ys.T, parameters):
 
@@ -36,6 +33,13 @@ def plain_vs_tiw(x, ys, parameters, id, output_file=None, axes_properties={}):
 
 	ax.set(**axes_properties)
 
+
+def plain_vs_tiw(x, ys, parameters, id, output_file=None, axes_properties={}):
+
+	ax, fig = setup_axes(id)
+
+	plain_vs_tiw_aux(ax, x, ys, parameters, axes_properties)
+
 	fig.show()
 
 	if output_file:
@@ -45,15 +49,18 @@ def plain_vs_tiw(x, ys, parameters, id, output_file=None, axes_properties={}):
 	return ax, fig
 
 
-def plain_vs_tiw_with_max_weight(x, ys, max_weight, parameters, id, output_file=None, axes_properties={}):
+def plain_vs_tiw_with_max_weight_aux(
+		ax, x, ys, max_weight, parameters, axes_properties={}, color_map=plt.cm.get_cmap('RdYlBu_r')):
 
-	parameters_without_labels = [{k: par[k] for k in par if k!='label'} for par in parameters]
+	parameters_without_labels = [{k: par[k] for k in par if k !='label'} for par in parameters]
+
 	for par in parameters_without_labels:
+
 		par['marker'] = 'None'
 
-	ax, fig = plain_vs_tiw(x, ys, parameters_without_labels, id, output_file=None, axes_properties=axes_properties)
+	plain_vs_tiw_aux(ax, x, ys, parameters_without_labels, axes_properties=axes_properties)
 
-	cm = plt.cm.get_cmap('RdYlBu_r')
+	cm = color_map
 
 	leg = []
 
@@ -70,10 +77,20 @@ def plain_vs_tiw_with_max_weight(x, ys, max_weight, parameters, id, output_file=
 	# the x axis is adjusted so that no empty space is left before the beginning of the plot
 	ax.set_xbound(lower=x[0], upper=x[-1])
 
+	# the *last* scatter plot is returned
+	return sc
+
+
+def plain_vs_tiw_with_max_weight(x, ys, max_weight, parameters, id, output_file=None, axes_properties={}):
+
+	ax, fig = setup_axes(id)
+
+	sc = plain_vs_tiw_with_max_weight_aux(ax, x, ys, max_weight, parameters, axes_properties)
+
 	color_bar = fig.colorbar(sc)
 
 	# label for the color bar
-	color_bar.ax.set_ylabel('$\max_i \\bar w^{(i)}$', labelpad=25, rotation=0)
+	color_bar.ax.set_ylabel('max. weight', labelpad=25)
 
 	fig.show()
 
@@ -84,25 +101,29 @@ def plain_vs_tiw_with_max_weight(x, ys, max_weight, parameters, id, output_file=
 	return ax, fig
 
 
-def variance(x, ys, output_file=None):
+def plain_vs_tiw_with_max_weight_multiple(
+		x, ys1, ys2, max_weight, parameters, id, output_file=None,
+		axes_properties1={}, axes_properties2={}):
 
-	ax, fig = setup_axes('variance')
+	fig, axes = plt.subplots(nrows=1, ncols=2)
 
-	for alg_y, label, color, marker in zip(np.rollaxis(ys, 2), ['plain IW', 'TIW'], ['black', 'blue'], ['s', 'o']):
+	plain_vs_tiw_with_max_weight_aux(axes[0], x, ys1, max_weight, parameters, axes_properties1)
+	sc = plain_vs_tiw_with_max_weight_aux(axes[1], x, ys2, max_weight, parameters, axes_properties2)
 
-		for y, coeff_label, linestyle in zip(alg_y, ['$\\theta_1$', '$\\theta_2$'], ['dotted', 'dashed']):
+	color_bar = fig.colorbar(sc)
 
-			ax.loglog(x, y, label='{} for {}'.format(coeff_label, label), color=color, marker=marker, linestyle=linestyle)
+	# label for the color bar
+	color_bar.ax.set_ylabel('max. weight', labelpad=25)
 
-	# the labels are shown
-	ax.legend()
+	fig.show()
 
-	ax.set_xlabel('number of particles')
-	ax.set_ylabel('variance estimates')
+	fig.tight_layout()
 
 	if output_file:
 
 		plt.savefig(output_file)
+
+	return axes, fig
 
 
 def single_curve(x, y, id, output_file=None, axes_properties={}):
@@ -119,13 +140,11 @@ def single_curve(x, y, id, output_file=None, axes_properties={}):
 		plt.savefig(output_file)
 
 
-def vs_two_variables_3d(x, y, z, output_file=None):
+def vs_two_variables(x1, x2, ys, id, output_file=None, axes_properties={}):
 
-	ax, fig = setup_axes('two')
+	ax, fig = setup_axes(id)
 
-	ax = fig.gca(projection='3d')
-
-	ax.plot_surface(x, y, z)
+	vs_two_variables_aux(ax, x1, x2, ys, axes_properties)
 
 	fig.show()
 
@@ -133,20 +152,35 @@ def vs_two_variables_3d(x, y, z, output_file=None):
 		plt.savefig(output_file)
 
 
-def vs_two_variables(x1, x2, ys, id, output_file=None, axes_properties={}):
+def vs_two_variables_aux(
+		ax, x1, x2, ys, axes_properties={},
+		colors=['blue', 'black', 'magenta', 'green', 'gray', 'brown'],
+		markers=['o', 's', 'd', 'h', '>', '*']):
 
-	ax, fig = setup_axes(id)
+	for y, color, marker, N in zip(ys.T, colors, markers, x2):
 
-	for y, color, N in zip(ys.T, ['blue', 'black', 'magenta', 'green', 'gray', 'brown'], x2):
+		ax.plot(x1, y, color=color, marker=marker, label='N = {}'.format(N))
 
-		ax.plot(x1, y, color=color, label='N = {}'.format(N))
+	ax.set_xbound(lower=x1[0], upper=x1[-1])
 
 	# the labels are shown
 	ax.legend()
 
 	ax.set(**axes_properties)
 
+
+def vs_two_variables_multiple(x1, x2, ys1, ys2, id, output_file=None, axes_properties1={}, axes_properties2={}):
+
+	fig, axes = plt.subplots(nrows=1, ncols=2)
+
+	vs_two_variables_aux(axes[0], x1, x2, ys1, axes_properties1)
+	vs_two_variables_aux(axes[1], x1, x2, ys2, axes_properties2)
+
+	# the legend for the first axis is moved down right
+	axes[0].legend(loc=4)
+
 	fig.show()
 
 	if output_file:
+
 		plt.savefig(output_file)

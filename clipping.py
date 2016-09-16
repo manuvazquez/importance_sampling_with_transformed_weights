@@ -43,10 +43,6 @@ n_mixture_components = len(mixture_coefficients)
 # there should be one mixture coefficient per mean
 assert len(true_means) == n_mixture_components
 
-# bad things can happen when computing "likelihood_factors" if these don't hold due to numpy's "broadcasting rules"
-assert n_mixture_components != max_N
-assert n_mixture_components != M
-
 # [<trial>, <component within the state vector>, <number of particles>, <algorithm>]
 estimates = np.empty((n_trials, n_monte_carlo_trials, n_mixture_components, len(M_Ts_list), len(Ns)))
 
