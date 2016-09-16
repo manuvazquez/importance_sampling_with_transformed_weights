@@ -28,9 +28,6 @@ def plain_vs_tiw_aux(ax, x, ys, parameters, axes_properties={}):
 
 		ax.loglog(x, y, **parameters)
 
-	# the labels are shown
-	ax.legend()
-
 	ax.set(**axes_properties)
 
 
@@ -39,6 +36,9 @@ def plain_vs_tiw(x, ys, parameters, id, output_file=None, axes_properties={}):
 	ax, fig = setup_axes(id)
 
 	plain_vs_tiw_aux(ax, x, ys, parameters, axes_properties)
+
+	# the labels are shown
+	ax.legend()
 
 	fig.show()
 
@@ -50,7 +50,7 @@ def plain_vs_tiw(x, ys, parameters, id, output_file=None, axes_properties={}):
 
 
 def plain_vs_tiw_with_max_weight_aux(
-		ax, x, ys, max_weight, parameters, axes_properties={}, color_map=plt.cm.get_cmap('RdYlBu_r')):
+		ax, x, ys, max_weight, parameters, fontsize, axes_properties={}, color_map=plt.cm.get_cmap('RdYlBu_r')):
 
 	parameters_without_labels = [{k: par[k] for k in par if k !='label'} for par in parameters]
 
@@ -72,7 +72,7 @@ def plain_vs_tiw_with_max_weight_aux(
 
 		sc = ax.scatter(x, y, c=w, cmap=cm, s=70, marker=par['marker'], vmin=0, vmax=1)
 
-	ax.legend(handles=leg)
+	ax.legend(handles=leg, fontsize=fontsize)
 
 	# the x axis is adjusted so that no empty space is left before the beginning of the plot
 	ax.set_xbound(lower=x[0], upper=x[-1])
@@ -81,16 +81,19 @@ def plain_vs_tiw_with_max_weight_aux(
 	return sc
 
 
-def plain_vs_tiw_with_max_weight(x, ys, max_weight, parameters, id, output_file=None, axes_properties={}):
+# FIXME: "fontsize" specifies the font size for the legend and colorbar label and ticks
+def plain_vs_tiw_with_max_weight(x, ys, max_weight, parameters, id, output_file=None, axes_properties={}, fontsize=16):
 
 	ax, fig = setup_axes(id)
 
-	sc = plain_vs_tiw_with_max_weight_aux(ax, x, ys, max_weight, parameters, axes_properties)
+	sc = plain_vs_tiw_with_max_weight_aux(ax, x, ys, max_weight, parameters, fontsize, axes_properties)
 
 	color_bar = fig.colorbar(sc)
 
+	color_bar.ax.tick_params(labelsize=fontsize)
+
 	# label for the color bar
-	color_bar.ax.set_ylabel('max. weight', labelpad=25)
+	color_bar.ax.set_ylabel('max. weight', labelpad=25, fontsize=fontsize)
 
 	fig.show()
 
@@ -151,6 +154,8 @@ def vs_two_variables(x1, x2, ys, id, output_file=None, axes_properties={}):
 	if output_file:
 		plt.savefig(output_file)
 
+	return ax, fig
+
 
 def vs_two_variables_aux(
 		ax, x1, x2, ys, axes_properties={},
@@ -184,3 +189,5 @@ def vs_two_variables_multiple(x1, x2, ys1, ys2, id, output_file=None, axes_prope
 	if output_file:
 
 		plt.savefig(output_file)
+
+	return axes, fig
