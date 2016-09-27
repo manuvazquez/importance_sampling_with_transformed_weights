@@ -51,7 +51,7 @@ assert len(true_means) == n_mixture_components
 # number of highest weights for the clipping procedure
 M_Ts_list = [n_clipped_particles_from_overall(M) for M in Ms]
 
-# [<trial>, <component within the state vector>, <number of particles>, <algorithm>]
+# [<observations realization>, <trial>, <component within the state vector>, <number of particles>, <algorithm>]
 estimates = np.empty((n_trials, n_monte_carlo_trials, n_mixture_components, len(Ms), 2))
 
 # [<trial>, <number of particles>, <algorithm>]

@@ -98,20 +98,13 @@ def plain_vs_tiw_with_max_weight_multiple(
 	plain_vs_tiw_with_max_weight_aux(axes[0], x, ys1, max_weight, parameters, axes_properties1)
 	sc = plain_vs_tiw_with_max_weight_aux(axes[1], x, ys2, max_weight, parameters, axes_properties2)
 
-	color_bar = fig.colorbar(sc)
-
-	# label for the color bar
-	color_bar.ax.set_ylabel('max. weight', labelpad=25)
-
 	fig.show()
-
-	fig.tight_layout()
 
 	if output_file:
 
 		plt.savefig(output_file)
 
-	return axes, fig
+	return axes, fig, sc
 
 
 def single_curve(x, y, id, output_file=None, axes_properties={}):
