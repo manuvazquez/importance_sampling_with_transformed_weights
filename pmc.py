@@ -10,10 +10,8 @@ import colorama
 import numpy as np
 from sklearn.mixture import GMM
 
-sys.path.append(os.path.join(os.environ['HOME'], 'python'))
-
 import util
-import manu.resampling
+import manu.smc.resampling
 
 # --------------------- parameters are read
 
@@ -97,7 +95,7 @@ class NonlinearPopulationMonteCarlo:
 		self.i_clipped, self.log_likelihoods = None, None
 		self.samples, self.weights = None, None
 
-		self.resampling_alg = manu.resampling.MultinomialResamplingAlgorithm(prng)
+		self.resampling_alg = manu.smc.resampling.MultinomialResamplingAlgorithm(prng)
 
 	def reset(self):
 

@@ -6,7 +6,6 @@ import numpy as np
 import h5py
 import numba
 
-sys.path.append(os.path.join(os.environ['HOME'], 'python'))
 import manu.util
 
 
