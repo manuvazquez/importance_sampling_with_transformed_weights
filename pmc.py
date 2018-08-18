@@ -1,7 +1,5 @@
 #! /usr/bin/env python3
 
-import os
-import sys
 import json
 import types
 
@@ -11,7 +9,7 @@ import numpy as np
 from sklearn.mixture import GMM
 
 import util
-import manu.smc.resampling
+import smc_tools.resampling
 
 # --------------------- parameters are read
 
@@ -95,7 +93,7 @@ class NonlinearPopulationMonteCarlo:
 		self.i_clipped, self.log_likelihoods = None, None
 		self.samples, self.weights = None, None
 
-		self.resampling_alg = manu.smc.resampling.MultinomialResamplingAlgorithm(prng)
+		self.resampling_alg = smc_tools.resampling.MultinomialResamplingAlgorithm(prng)
 
 	def reset(self):
 

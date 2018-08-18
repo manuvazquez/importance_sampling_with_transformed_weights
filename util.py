@@ -1,12 +1,10 @@
-import sys
-import os
 import pickle
 
 import numpy as np
 import h5py
 import numba
 
-import manu.util
+import utils.file
 
 
 @numba.jit(numba.float64[:](numba.float64[:, :], numba.float64[:], numba.float64[:], numba.float64), nopython=True)
@@ -42,7 +40,7 @@ def compute_loglikelihoods(samples, obs, mixture_coefficients, variance):
 def save_data(parameters, estimates, true_means, M_eff, max_weight, random_seed, attributes):
 
 	# output data file
-	output_file = manu.util.filename_from_host_and_date()
+	output_file = utils.file.filename_from_host_and_date()
 
 	file = h5py.File('res_' + output_file + '.hdf5', 'w')
 
