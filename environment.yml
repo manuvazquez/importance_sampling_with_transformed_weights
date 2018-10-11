@@ -1,0 +1,35 @@
+name: tiw
+channels:
+  - defaults
+dependencies:
+  - blas=1.0=mkl
+  - ca-certificates=2018.03.07=0
+  - certifi=2018.8.24=py35_1
+  - colorama=0.3.9=py35h81e2b6c_0
+  - h5py=2.8.0=py35h989c5e5_3
+  - hdf5=1.10.2=hba1933b_1
+  - libedit=3.1.20170329=h6b74fdf_2
+  - libffi=3.2.1=hd88cf55_4
+  - libgcc-ng=8.2.0=hdf63c60_1
+  - libgfortran=3.0.0=1
+  - libgfortran-ng=7.3.0=hdf63c60_0
+  - libstdcxx-ng=8.2.0=hdf63c60_1
+  - llvmlite=0.24.0=py35hdbcaa40_0
+  - mkl=11.3.3=0
+  - ncurses=6.1=hf484d3e_0
+  - numba=0.39.0=py35h04863e7_0
+  - numpy=1.11.3=py35h3dfced4_4
+  - openssl=1.0.2p=h14c3975_0
+  - pip=10.0.1=py35_0
+  - python=3.5.6=hc3d631a_0
+  - readline=7.0=h7b6447c_5
+  - scikit-learn=0.17.1=np111py35_2
+  - scipy=0.18.1=np111py35_0
+  - setuptools=40.2.0=py35_0
+  - six=1.11.0=py35_1
+  - sqlite=3.25.2=h7b6447c_0
+  - tk=8.6.8=hbc83047_0
+  - wheel=0.31.1=py35_0
+  - xz=5.2.4=h14c3975_4
+  - zlib=1.2.11=ha838bed_2
+
